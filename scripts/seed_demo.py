@@ -1,7 +1,7 @@
 """Insert three demo products with 30 days of price history, for screenshots.
 
 Local development only:
-    DATABASE_URL=postgresql+psycopg://tracker:tracker@localhost:5432/tracker python -m scripts.seed_demo
+    docker compose exec web python -m scripts.seed_demo
 """
 
 import random
@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from app.config import settings
+from app.config import Settings, settings
 from app.db import make_engine, make_session_factory
 from app.models import PricePoint, Product
 
@@ -21,9 +21,14 @@ DEMO = [
 ]
 
 
+def check_safe_to_seed(settings: Settings, argv: list[str]) -> None:
+    # A public HTTPS address means this is the live site; demo data would show up there.
+    if settings.public_base_url.startswith("https://") and "--force" not in argv:
+        raise SystemExit("Refusing to add demo data to the live site. Pass --force if you really mean it.")
+
+
 def main() -> None:
-    if "localhost" not in settings.database_url and "--force" not in sys.argv:
-        raise SystemExit("Refusing to seed a non-local database. Pass --force if you really mean it.")
+    check_safe_to_seed(settings, sys.argv[1:])
 
     now = datetime.now(UTC)
     rng = random.Random(7)
