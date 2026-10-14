@@ -91,9 +91,14 @@ def record_failure(session: Session, product_id: int, error: FetchError, now: da
         product.last_error = f"{error.kind}: {str(error)[:200]}"
         product.next_check_at = now + backoff_delay(product.consecutive_failures)
 
+        never_worked = product.last_success_at is None
+        if never_worked and product.consecutive_failures == 1:
+            # The user was told "checking now"; don't leave them waiting hours.
+            _notify_watchers(session, product, NotificationKind.UNREADABLE, now)
         if product.status == ProductStatus.ACTIVE and product.consecutive_failures >= FAILING_AFTER:
             product.status = ProductStatus.FAILING
-            _notify_watchers(session, product, NotificationKind.FAILING, now)
+            if not never_worked:
+                _notify_watchers(session, product, NotificationKind.FAILING, now)
 
         last_good = product.last_success_at or product.created_at
         if product.status == ProductStatus.FAILING and now - last_good > DEAD_AFTER:

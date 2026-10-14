@@ -1,6 +1,7 @@
 """What the bot does with each message. Returns replies; the webhook sends them."""
 
 import math
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from html import escape
@@ -10,13 +11,24 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.fetching.plugins import plugin_for
-from app.models import Product, ProductStatus, User, Watch, new_public_id
-from app.money import format_sen, parse_ringgit
+from app.models import Product, ProductStatus, User, Watch, WatchAddition, new_public_id
+from app.money import MAX_PRICE_SEN, format_sen, parse_ringgit
+from app.notify.messages import short_title
 from app.urls import InvalidUrl, extract_url, normalize_url
 
 MAX_WATCHES = 20
 MAX_NEW_PER_DAY = 10
 CHECK_COOLDOWN = timedelta(minutes=60)
+# Telegram's limit is 4096 characters per message.
+MESSAGE_LIMIT = 4000
+
+# Shops known to block automated price checks (see docs/findings).
+_UNSUPPORTED_HOSTS = ("shopee.com.my", "shopee.sg", "shopee.co.id", "shp.ee")
+UNSUPPORTED = (
+    "Sorry, Shopee can't be tracked: it blocks automated price checks, and this bot "
+    "doesn't try to get around that. Links from shops that publish standard product "
+    "information work, for example Machines or Senheng."
+)
 
 HELP = (
     "Send me a link to a product page and I'll tell you when its price drops.\n\n"
@@ -50,7 +62,20 @@ def handle_update(session: Session, update: dict, *, now: datetime, base_url: st
     ctx = _Context(session, user, now, base_url.rstrip("/"))
     reply = _dispatch(ctx, text.strip())
     session.commit()
-    return [Reply(chat_id, reply)]
+    return [Reply(chat_id, part) for part in _split(reply)]
+
+
+def _split(html: str) -> list[str]:
+    """Split a long reply at blank lines so each part fits in one message."""
+    parts, current = [], ""
+    for block in html.split("\n\n"):
+        candidate = f"{current}\n\n{block}" if current else block
+        if len(candidate) > MESSAGE_LIMIT and current:
+            parts.append(current)
+            candidate = block
+        current = candidate
+    parts.append(current)
+    return parts
 
 
 @dataclass
@@ -91,6 +116,10 @@ def _add(ctx: _Context, raw_url: str) -> str:
     except InvalidUrl:
         return "That link doesn't look right. Send a normal http(s) product link."
 
+    host = (urlsplit(url).hostname or "").removeprefix("www.")
+    if host.endswith(_UNSUPPORTED_HOSTS):
+        return UNSUPPORTED
+
     session, user = ctx.session, ctx.user
     product = session.scalar(select(Product).where(Product.url == url))
     if product and session.scalar(
@@ -103,8 +132,8 @@ def _add(ctx: _Context, raw_url: str) -> str:
         return f"You can track up to {MAX_WATCHES} products. Remove one with /remove first."
     recent = session.scalar(
         select(func.count())
-        .select_from(Watch)
-        .where(Watch.user_id == user.id, Watch.created_at > ctx.now - timedelta(days=1))
+        .select_from(WatchAddition)
+        .where(WatchAddition.user_id == user.id, WatchAddition.added_at > ctx.now - timedelta(days=1))
     )
     if recent >= MAX_NEW_PER_DAY:
         return f"You've added {MAX_NEW_PER_DAY} products in the last 24 hours. Try again tomorrow."
@@ -129,6 +158,7 @@ def _add(ctx: _Context, raw_url: str) -> str:
     if product.status == ProductStatus.DEAD:
         _revive(product, ctx.now)
 
+    session.add(WatchAddition(user_id=user.id, added_at=ctx.now))
     session.add(
         Watch(
             user_id=user.id,
@@ -188,7 +218,7 @@ def _target(ctx: _Context, args: list[str]) -> str:
         target = parse_ringgit(args[1])
     except ValueError:
         return usage
-    if target <= 0:
+    if not 0 < target <= MAX_PRICE_SEN:
         return usage
     watch.target_price_sen = target
     watch.target_armed = True
@@ -245,7 +275,7 @@ def _pick(ctx: _Context, number: str) -> tuple[Watch, Product] | str:
 
 
 def _title(product: Product) -> str:
-    return escape(product.title or product.url, quote=False)
+    return escape(short_title(product.title or product.url), quote=False)
 
 
 _COMMANDS = {

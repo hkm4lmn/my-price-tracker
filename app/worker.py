@@ -23,7 +23,7 @@ from app.db import make_engine, make_session_factory
 from app.fetching.errors import FetchError
 from app.fetching.plugins import fetch_snapshot
 from app.fetching.snapshot import Snapshot
-from app.models import CheckResult, Product
+from app.models import CheckResult, Product, WatchAddition
 from app.notify.outbox import send_pending
 from app.notify.telegram import LogOnlyTelegram, TelegramClient
 from app.tracking.claim import claim_due
@@ -57,6 +57,7 @@ def run_once(
 
     with session_factory() as session:
         session.execute(delete(CheckResult).where(CheckResult.checked_at < clock.now() - CHECK_RESULTS_KEPT))
+        session.execute(delete(WatchAddition).where(WatchAddition.added_at < clock.now() - timedelta(days=2)))
         session.commit()
     return len(ids)
 
@@ -67,19 +68,20 @@ def _check_one(session_factory, product_id, *, clock, rng, snapshot_fn, pacer) -
         product = session.get(Product, product_id)
         url, shop = product.url, product.shop
         pacer.wait(urlsplit(url).hostname or "")
+        # Anything that goes wrong for one product, from fetching it to saving
+        # the result, is recorded against that product and the batch carries on.
         try:
             snapshot = snapshot_fn(url)
+            record_success(session, product_id, snapshot, clock.now(), rng)
+            outcome = "ok"
         except FetchError as e:
             outcome = e.kind
             record_failure(session, product_id, e, clock.now())
         except Exception as e:
-            # A bug in one plug-in must not stop every other product's checks.
             log.exception("unexpected error checking product %s", product_id)
             outcome = "internal"
-            record_failure(session, product_id, FetchError(f"{type(e).__name__}: {e}", kind="internal"), clock.now())
-        else:
-            outcome = "ok"
-            record_success(session, product_id, snapshot, clock.now(), rng)
+            session.rollback()
+            record_failure(session, product_id, FetchError(f"{type(e).__name__}: {e}"[:200], kind="internal"), clock.now())
     log.info("checked product=%s shop=%s result=%s in %.1fs", product_id, shop, outcome, time.monotonic() - started)
 
 

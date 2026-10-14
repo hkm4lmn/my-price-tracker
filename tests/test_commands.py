@@ -97,15 +97,49 @@ def test_watch_limit_20(session):
 
 
 def test_daily_new_watch_limit_10(session):
-    u = make_user(session, chat_id=CHAT)
     for i in range(10):
-        make_watch(session, u, make_product(session), created_at=NOW - timedelta(hours=23))
+        send(session, f"https://shop.my/p{i}", now=NOW - timedelta(hours=23))
     text = send(session, "https://shop.my/eleventh")
     assert "10" in text
     assert len(watches(session)) == 10
-    # A day later it's allowed again.
+    # A day after those adds it's allowed again.
     send(session, "https://shop.my/eleventh", now=NOW + timedelta(hours=1, minutes=1))
     assert len(watches(session)) == 11
+
+
+def test_daily_limit_not_reset_by_removing(session):
+    for i in range(10):
+        send(session, f"https://shop.my/p{i}")
+        send(session, "/remove 1")
+    assert watches(session) == []
+    text = send(session, "https://shop.my/p10")
+    assert "10" in text
+    assert watches(session) == []
+
+
+def test_shopee_links_refused_with_reason(session):
+    for link in ("https://shopee.com.my/Some-Item-i.1.2", "https://shp.ee/abc123"):
+        text = send(session, link)
+        assert "shopee" in text.lower()
+    assert session.scalar(select(func.count()).select_from(Product)) == 0
+
+
+def test_list_split_under_telegram_limit(session):
+    u = make_user(session, chat_id=CHAT)
+    for i in range(20):
+        make_watch(session, u, make_product(session, title=f"{i:02d} " + "Long product name " * 9, current_price_sen=100))
+    replies = handle_update(session, msg("/list"), now=NOW, base_url=BASE)
+    assert all(len(r.html) <= 4096 for r in replies)
+    joined = "\n".join(r.html for r in replies)
+    assert all(f"{n}. <b>" in joined for n in range(1, 21))
+
+
+def test_huge_target_gets_usage_reply(session):
+    send(session, "https://shop.my/a")
+    text = send(session, "/target 1 99999999999")
+    assert "/target" in text
+    session.expire_all()
+    assert watches(session)[0].target_price_sen is None
 
 
 def test_list_numbering_and_prices(session):

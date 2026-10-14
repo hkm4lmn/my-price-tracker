@@ -4,10 +4,17 @@ from html import escape
 
 from app.money import format_sen
 
+# Telegram messages are capped at 4096 characters; shop titles can be huge.
+TITLE_LIMIT = 80
+
+
+def short_title(title: str) -> str:
+    return title if len(title) <= TITLE_LIMIT else title[: TITLE_LIMIT - 1].rstrip() + "…"
+
 
 def render(kind: str, payload: dict, *, base_url: str) -> str:
     # Titles only appear as element text, never inside an attribute.
-    title = f"<b>{escape(payload['product_title'], quote=False)}</b>"
+    title = f"<b>{escape(short_title(payload['product_title']), quote=False)}</b>"
     link = f"{base_url.rstrip('/')}/p/{payload['public_id']}"
 
     def price(key: str) -> str:
@@ -27,6 +34,12 @@ def render(kind: str, payload: dict, *, base_url: str) -> str:
         return f"📦 {title} is back in stock at {price('new_price_sen')}.\n{link}"
     if kind == "failing":
         return f"⚠️ I can't read the price for {title} right now. I'll keep trying."
+    if kind == "unreadable":
+        return (
+            f"⚠️ I couldn't read a price from {title}. Some shops don't publish product "
+            "information on their pages, so they can't be tracked. I'll keep trying for a "
+            "few days; use /remove if you'd rather stop."
+        )
     if kind == "dead":
         return (
             f"❌ I've stopped tracking {title} after 7 days of failed checks. "

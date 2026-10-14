@@ -186,3 +186,15 @@ def test_image_falls_back_to_og_image():
     # Senheng's JSON-LD only references images by @id.
     snap = plugin.parse(page_from_file("senheng_honor.html"))
     assert snap.image_url == "https://www.senheng.com.my/wp-content/uploads/2026/09/PURPLE.jpg"
+
+
+def test_title_nul_stripped_and_length_capped():
+    data = product({"price": "1"}, name="Fan\u0000 " + "x" * 400)
+    title = plugin.parse(page_with_jsonld(data)).title
+    assert "\x00" not in title
+    assert len(title) <= 300
+
+
+def test_absurd_price_is_parse_error():
+    with pytest.raises(ParseError):
+        plugin.parse(page_with_jsonld(product({"price": "99999999"})))

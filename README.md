@@ -95,7 +95,7 @@ pip install -r requirements-dev.txt
 TEST_DATABASE_URL=postgresql+psycopg://tracker:tracker@localhost:5432/tracker_test pytest
 ```
 
-There are 201 tests. Without `TEST_DATABASE_URL`, the database tests are skipped and only the pure-logic tests run. GitHub Actions runs everything against PostgreSQL 16 on every push.
+There are 214 tests. Without `TEST_DATABASE_URL`, the database tests are skipped and only the pure-logic tests run. GitHub Actions runs everything against PostgreSQL 16 on every push.
 
 ## Configuration
 

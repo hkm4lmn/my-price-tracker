@@ -15,8 +15,9 @@ from selectolax.lexbor import LexborHTMLParser as HTMLParser
 from app.fetching.errors import ParseError
 from app.fetching.safe_http import FetchedPage
 from app.fetching.snapshot import Snapshot
-from app.money import parse_ringgit
+from app.money import MAX_PRICE_SEN, parse_ringgit
 
+MAX_TITLE_LENGTH = 300
 _OUT_OF_STOCK = {"outofstock", "soldout", "discontinued"}
 _PRODUCT_TYPES = {"Product", "ProductGroup"}
 
@@ -131,9 +132,12 @@ def _offer_price(offer: dict) -> tuple[int | None, str | None]:
     if raw is None or raw == "":
         return None, currency
     try:
-        return parse_ringgit(str(raw)), currency
+        price = parse_ringgit(str(raw))
     except ValueError as e:
         raise ParseError(f"unreadable price {raw!r}") from e
+    if price > MAX_PRICE_SEN:
+        raise ParseError(f"implausible price {raw!r}")
+    return price, currency
 
 
 def _cheapest(priced: list[tuple[int, bool]]) -> int | None:
@@ -157,7 +161,10 @@ def _image(value: Any) -> str | None:
 
 
 def _text(value: Any) -> str:
-    return html.unescape(value).strip() if isinstance(value, str) else ""
+    if not isinstance(value, str):
+        return ""
+    # PostgreSQL text can't hold NUL characters; page data is untrusted.
+    return html.unescape(value).replace("\x00", "").strip()[:MAX_TITLE_LENGTH]
 
 
 def _from_opengraph(tree: HTMLParser) -> Snapshot:
@@ -173,6 +180,8 @@ def _from_opengraph(tree: HTMLParser) -> Snapshot:
         price = parse_ringgit(amount)
     except ValueError as e:
         raise ParseError(f"unreadable price {amount!r}") from e
+    if price > MAX_PRICE_SEN:
+        raise ParseError(f"implausible price {amount!r}")
     availability = (meta.get("product:availability") or "").replace(" ", "").lower()
     return Snapshot(
         title=title,

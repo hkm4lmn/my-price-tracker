@@ -49,8 +49,11 @@ def test_run_once_success_and_failure_paths(session, session_factory):
     good, bad = session.get(Product, good.id), session.get(Product, bad.id)
     assert good.current_price_sen == 12900
     assert bad.consecutive_failures == 1 and bad.last_error == "blocked: HTTP 403"
-    # The tracking_started alert went out in the same run.
-    assert len(tg.sent) == 1 and tg.sent[0][0] == 55 and "Fan" in tg.sent[0][1]
+    # Both alerts went out in the same run: tracking started for the good
+    # product, and "couldn't read a price" for the new product that failed.
+    assert [chat for chat, _ in tg.sent] == [55, 55]
+    assert "Now tracking <b>Fan</b>" in tg.sent[0][1]
+    assert "couldn't read a price" in tg.sent[1][1]
 
 
 def test_run_once_nothing_due(session, session_factory):
@@ -99,3 +102,31 @@ def test_run_once_prunes_old_check_results(session, session_factory):
     run_once(session_factory, **deps(lambda url: None))
     remaining = session.scalar(select(func.count()).select_from(CheckResult))
     assert remaining == 1
+
+
+def test_run_once_continues_when_saving_a_result_fails(session, session_factory):
+    good, bad = two_watched_products(session)
+    from app.tracking import record as record_module
+
+    real = record_module.record_success
+
+    def flaky(s, product_id, *args, **kwargs):
+        if product_id == bad.id:
+            raise RuntimeError("database rejected the row")
+        return real(s, product_id, *args, **kwargs)
+
+    snap = Snapshot(title="Fan", price_sen=100, in_stock=True, currency="MYR", image_url=None)
+    import app.worker as worker_module
+
+    original = worker_module.record_success
+    worker_module.record_success = flaky
+    try:
+        assert run_once(session_factory, **deps(lambda url: snap)) == 2
+    finally:
+        worker_module.record_success = original
+
+    session.expire_all()
+    assert session.get(Product, good.id).current_price_sen == 100
+    bad = session.get(Product, bad.id)
+    assert bad.last_error.startswith("internal")
+    assert bad.consecutive_failures == 1

@@ -124,6 +124,8 @@ def test_record_success_without_any_price_is_a_failure(session, setup):
 
 def test_record_failure_backoff_and_failing_once(session, setup):
     _, product, _ = setup
+    # A product that has worked before; never-read products get "unreadable" instead.
+    record_success(session, product.id, snap(100), NOW - timedelta(days=1), RNG)
     delays = []
     t = NOW
     for _ in range(4):
@@ -135,7 +137,7 @@ def test_record_failure_backoff_and_failing_once(session, setup):
     assert delays == [timedelta(minutes=30), timedelta(hours=2), timedelta(hours=6), timedelta(hours=24)]
     assert product.status == "failing"
     assert product.last_error == "blocked: HTTP 403"
-    assert [n.kind for n in notifications(session)] == ["failing"]
+    assert [n.kind for n in notifications(session)] == ["tracking_started", "failing"]
     assert count(session, CheckResult, ok=False, error_kind="blocked") == 4
 
 
@@ -173,3 +175,17 @@ def test_watch_state_saved(session, setup):
     (watch,) = refresh(session, watch)
     assert watch.target_armed is False
     assert [n.kind for n in notifications(session)] == ["tracking_started", "target_reached"]
+
+
+def test_first_check_failure_notifies_once_and_skips_failing_message(session, setup):
+    user, product, _ = setup
+    for i in range(3):
+        record_failure(session, product.id, ParseError("no product data"), NOW + timedelta(hours=i))
+    assert [n.kind for n in notifications(session)] == ["unreadable"]
+
+
+def test_failure_after_success_does_not_send_unreadable(session, setup):
+    _, product, _ = setup
+    record_success(session, product.id, snap(100), NOW, RNG)
+    record_failure(session, product.id, Blocked("x"), NOW + timedelta(hours=1))
+    assert [n.kind for n in notifications(session)] == ["tracking_started"]

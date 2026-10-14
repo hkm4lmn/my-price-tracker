@@ -47,6 +47,7 @@ class NotificationKind:
     FAILING = "failing"
     DEAD = "dead"
     TRACKING_STARTED = "tracking_started"
+    UNREADABLE = "unreadable"
 
 
 class User(Base):
@@ -116,6 +117,18 @@ class Watch(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class WatchAddition(Base):
+    """When a user added a product. Kept when the watch is removed, so the
+    daily limit can't be dodged by adding and removing. Pruned after 2 days."""
+
+    __tablename__ = "watch_additions"
+    __table_args__ = (Index("ix_watch_additions_user_added", "user_id", "added_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PricePoint(Base):

@@ -42,3 +42,14 @@ def test_render_handles_base_url_trailing_slash():
 def test_render_unknown_kind_raises():
     with pytest.raises(ValueError):
         render("nope", PRODUCT, base_url=BASE)
+
+
+def test_render_unreadable():
+    text = render("unreadable", PRODUCT, base_url=BASE)
+    assert "<b>Kettle</b>" in text and "couldn't read a price" in text
+
+
+def test_render_truncates_long_titles():
+    text = render("back_in_stock", {**PRODUCT, "product_title": "A" * 500, "new_price_sen": 1}, base_url=BASE)
+    assert "A" * 81 not in text
+    assert "…" in text

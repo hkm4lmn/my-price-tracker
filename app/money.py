@@ -7,6 +7,10 @@ floats do; these two functions are the only places that convert.
 import re
 from decimal import Decimal, InvalidOperation
 
+# RM 10 million. Anything above is a parsing mistake or a hostile page, and
+# would overflow the integer price columns.
+MAX_PRICE_SEN = 1_000_000_000
+
 _NUMBER = re.compile(r"^\d{1,3}(,\d{3})*(\.\d{1,2})?$|^\d+(\.\d{1,2})?$")
 
 
