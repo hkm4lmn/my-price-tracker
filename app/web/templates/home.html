@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="intro">
+  <h1>Get a message when the thing you want gets cheaper.</h1>
+  <p class="lede">Send a product link to the Telegram bot. It checks the price every six hours and tells you when it drops, reaches your target price, or comes back in stock.</p>
+  {% if bot_username %}
+  <p><a class="button" href="https://t.me/{{ bot_username }}">Open the bot in Telegram</a></p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li>Send the bot a link to a product page.</li>
+    <li>It reads the price and checks again every six hours.</li>
+    <li>You get a message when the price drops. Use <code>/target</code> to only hear about prices below a number you choose.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Which shops work</h2>
+  <p>Shops that publish standard product information on their pages, which many Malaysian shops do for search engines. Machines and Senheng work, for example. Shopee doesn't: it blocks automated price checks, and this tracker doesn't try to get around that.</p>
+</section>
+{% endblock %}

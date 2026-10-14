@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Status | MY Price Tracker{% endblock %}
+{% block content %}
+<h1>Service status</h1>
+<p class="lede">{{ counts.active }} active, {{ counts.failing }} having trouble, {{ counts.dead }} stopped.</p>
+
+<h2>Price checks by shop reader</h2>
+{% if health %}
+<table class="health">
+  <thead><tr><th scope="col">Reader</th><th scope="col">Last 24 hours</th><th scope="col">Last 7 days</th></tr></thead>
+  <tbody>
+    {% for h in health %}
+    <tr>
+      <th scope="row">{{ h.shop }}</th>
+      <td>{{ rate(h.ok_24h, h.total_24h) }}</td>
+      <td>{{ rate(h.ok_7d, h.total_7d) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="small">Successful checks out of all checks. A sudden drop usually means a shop changed its page layout or started blocking requests.</p>
+{% else %}
+<p>No price checks in the last 7 days.</p>
+{% endif %}
+{% endblock %}

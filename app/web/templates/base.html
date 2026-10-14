@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}MY Price Tracker{% endblock %}</title>
+  <meta name="description" content="{% block description %}Telegram alerts when prices drop at Malaysian online shops.{% endblock %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="/">MY Price Tracker</a>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site">
+    <p>Prices are read from shop pages every few hours and may be out of date. Always check the shop before buying.</p>
+    <p><a href="/status">Service status</a> <span aria-hidden="true">/</span> <a href="https://github.com/hkm4lmn/my-price-tracker">Source code</a></p>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

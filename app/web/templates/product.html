@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | MY Price Tracker{% endblock %}
+{% block description %}Price history for {{ title }}.{% endblock %}
+{% block content %}
+<article class="product">
+  <h1>{{ title }}</h1>
+  <p class="shop"><a href="{{ product.url }}" rel="nofollow noopener">View on {{ shop_host }}</a></p>
+
+  {% if product.status == "failing" %}
+  <p class="notice">I can't read this price right now, so it may be out of date. Checks will keep trying.</p>
+  {% elif product.status == "dead" %}
+  <p class="notice">Checks stopped after 7 days of failures. The last price shown may be out of date.</p>
+  {% endif %}
+
+  {% if product.current_price_sen is none %}
+  <p class="pending">Waiting for the first price check. This page fills in once it's done.</p>
+  {% else %}
+  <div class="price-row">
+    <div class="ticket" aria-label="Current price">
+      <span class="currency">RM</span><span class="amount">{{ price_amount }}</span>
+    </div>
+    <dl class="facts">
+      <div><dt>Stock</dt><dd>{{ "In stock" if product.in_stock else "Out of stock" }}</dd></div>
+      {% if lowest %}<div><dt>Lowest seen</dt><dd>{{ lowest }}</dd></div>{% endif %}
+      <div><dt>Last checked</dt><dd>{{ checked_ago }}</dd></div>
+    </dl>
+  </div>
+
+  {% if history|length > 1 %}
+  <figure class="chart">
+    <canvas id="chart" role="img" aria-label="Price history chart for {{ title }}"></canvas>
+  </figure>
+  {% endif %}
+
+  <h2>Price changes</h2>
+  <ul class="changes">
+    {% for change in changes %}
+    <li><time datetime="{{ change.iso }}">{{ change.date }}</time> <span class="{{ change.direction }}">{{ change.price }}</span>{% if not change.in_stock %} <span class="oos">out of stock</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% endblock %}
+{% block scripts %}
+{% if history|length > 1 %}
+<script type="application/json" id="history">{{ history|tojson }}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/static/chart.js"></script>
+{% endif %}
+{% endblock %}
