@@ -1,3 +1,14 @@
+# Local development. Production uses deploy/docker-compose.prod.yml.
+# Without TELEGRAM_BOT_TOKEN in .env, alerts are logged instead of sent.
+
+x-app: &app
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://tracker:tracker@db:5432/tracker
+
 services:
   db:
     image: postgres:16
@@ -15,6 +26,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

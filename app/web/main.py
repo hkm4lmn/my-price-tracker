@@ -23,7 +23,7 @@ from app.clock import Clock, SystemClock
 from app.config import Settings
 from app.models import PricePoint, Product, User
 from app.money import format_sen
-from app.notify.telegram import TelegramBlocked, TelegramClient, TelegramError
+from app.notify.telegram import LogOnlyTelegram, TelegramBlocked, TelegramClient, TelegramError
 from app.web.stats import plugin_health, price_history, product_counts, time_ago
 
 log = logging.getLogger("web")
@@ -175,6 +175,10 @@ def build_default_app() -> FastAPI:
     settings = Settings()
     return create_app(
         session_factory=make_session_factory(make_engine(settings.database_url)),
-        telegram=TelegramClient(settings.telegram_bot_token, httpx.Client()),
+        telegram=(
+            TelegramClient(settings.telegram_bot_token, httpx.Client())
+            if settings.telegram_bot_token
+            else LogOnlyTelegram()
+        ),
         settings=settings,
     )

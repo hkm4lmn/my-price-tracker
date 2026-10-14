@@ -80,3 +80,11 @@ def test_token_not_in_error_message():
     with pytest.raises(TelegramError) as info:
         client.send_message(42, "x")
     assert "123:ABC" not in str(info.value)
+
+
+def test_log_only_client_logs_instead_of_sending(caplog):
+    from app.notify.telegram import LogOnlyTelegram
+
+    with caplog.at_level("INFO"):
+        LogOnlyTelegram().send_message(42, "<b>hi</b>")
+    assert "42" in caplog.text and "<b>hi</b>" in caplog.text

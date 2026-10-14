@@ -25,7 +25,7 @@ from app.fetching.plugins import fetch_snapshot
 from app.fetching.snapshot import Snapshot
 from app.models import CheckResult, Product
 from app.notify.outbox import send_pending
-from app.notify.telegram import TelegramClient
+from app.notify.telegram import LogOnlyTelegram, TelegramClient
 from app.tracking.claim import claim_due
 from app.tracking.pacing import HostPacer
 from app.tracking.record import record_failure, record_success
@@ -85,11 +85,12 @@ def _check_one(session_factory, product_id, *, clock, rng, snapshot_fn, pacer) -
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    if not settings.telegram_bot_token:
-        raise SystemExit("TELEGRAM_BOT_TOKEN is not set")
-
     session_factory = make_session_factory(make_engine(settings.database_url))
-    telegram = TelegramClient(settings.telegram_bot_token, httpx.Client())
+    if settings.telegram_bot_token:
+        telegram = TelegramClient(settings.telegram_bot_token, httpx.Client())
+    else:
+        log.warning("TELEGRAM_BOT_TOKEN is not set: alerts will be logged, not sent")
+        telegram = LogOnlyTelegram()
     deps = dict(
         clock=SystemClock(),
         rng=random.Random(),

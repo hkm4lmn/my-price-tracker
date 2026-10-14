@@ -1,6 +1,10 @@
 """A small client for the two Telegram Bot API calls the app uses."""
 
+import logging
+
 import httpx
+
+log = logging.getLogger("telegram")
 
 
 class TelegramError(Exception):
@@ -45,3 +49,13 @@ class TelegramClient:
         if response.status_code == 403 or "chat not found" in description.lower():
             raise TelegramBlocked(description)
         raise TelegramError(f"{method}: HTTP {response.status_code} {description}".strip())
+
+
+class LogOnlyTelegram:
+    """Stand-in for local development without a bot token: logs instead of sending."""
+
+    def send_message(self, chat_id: int, html: str) -> None:
+        log.info("would send to %s: %s", chat_id, html)
+
+    def set_webhook(self, url: str, secret: str) -> None:
+        log.info("would set webhook to %s", url)
