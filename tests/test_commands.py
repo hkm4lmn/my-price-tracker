@@ -253,3 +253,10 @@ def test_non_text_update_ignored(session):
 def test_group_chats_ignored(session):
     assert handle_update(session, msg("/start", chat_type="group"), now=NOW, base_url=BASE) == []
     assert user(session) is None
+
+
+def test_lazada_links_refused_with_reason(session):
+    for link in ("https://www.lazada.com.my/products/pdp-i1-s2.html", "https://s.lazada.com.my/s.abc"):
+        text = send(session, link)
+        assert "lazada" in text.lower()
+    assert session.scalar(select(func.count()).select_from(Product)) == 0

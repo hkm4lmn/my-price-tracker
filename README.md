@@ -48,7 +48,7 @@ Two processes share one PostgreSQL database. The **web** process answers Telegra
 | Money stored as **integer sen** | Floats can't represent amounts like 0.10 exactly |
 | **SSRF protection** on every fetch | Anyone can send the bot a link, so links to `localhost`, private networks or cloud metadata (`169.254.169.254`) must never be fetched. Every address a host resolves to is checked, on every redirect, and the request goes to the exact IP that passed the check, so DNS can't change in between |
 | **Plug-in design**, with a general schema.org reader as the default | Many shops publish standard product data for search engines, so one reader covers them. A shop that needs special handling gets its own plug-in |
-| No Shopee support | Shopee only serves product data to its own app and blocks direct requests (HTTP 403, anti-bot error `90309999`). Supporting it would mean getting around that protection. Details are in [`docs/findings`](docs/findings/2026-10-shopee-lazada.md) |
+| No Shopee or Lazada support | Shopee blocks direct requests (HTTP 403, anti-bot error `90309999`), and Lazada's terms forbid automated access. The bot refuses their links with an explanation instead of trying. Details are in [`docs/findings`](docs/findings/2026-10-shopee-lazada.md) |
 
 ### Proving the guarantees
 
@@ -95,7 +95,7 @@ pip install -r requirements-dev.txt
 TEST_DATABASE_URL=postgresql+psycopg://tracker:tracker@localhost:5432/tracker_test pytest
 ```
 
-There are 214 tests. Without `TEST_DATABASE_URL`, the database tests are skipped and only the pure-logic tests run. GitHub Actions runs everything against PostgreSQL 16 on every push.
+There are 215 tests. Without `TEST_DATABASE_URL`, the database tests are skipped and only the pure-logic tests run. GitHub Actions runs everything against PostgreSQL 16 on every push.
 
 ## Configuration
 
@@ -130,7 +130,7 @@ tests/             pytest suite, with saved product pages as fixtures
 
 ## What I'd add next
 
-- A Lazada plug-in, if its terms allow it and it doesn't block the server ([findings](docs/findings/2026-10-shopee-lazada.md))
+- Plug-ins for more Malaysian shops that allow automated price checks
 - Replies in Malay as well as English
 - Letting users choose a variant (colour, storage size) instead of tracking the cheapest in-stock one
 

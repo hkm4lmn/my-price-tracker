@@ -22,12 +22,19 @@ CHECK_COOLDOWN = timedelta(minutes=60)
 # Telegram's limit is 4096 characters per message.
 MESSAGE_LIMIT = 4000
 
-# Shops known to block automated price checks (see docs/findings).
-_UNSUPPORTED_HOSTS = ("shopee.com.my", "shopee.sg", "shopee.co.id", "shp.ee")
+# Shops that don't allow automated price checks (see docs/findings): Shopee
+# blocks them, and Lazada's terms forbid them.
+_UNSUPPORTED_SHOPS = {
+    "shopee.com.my": "Shopee",
+    "shopee.sg": "Shopee",
+    "shopee.co.id": "Shopee",
+    "shp.ee": "Shopee",
+    "lazada.com.my": "Lazada",
+}
 UNSUPPORTED = (
-    "Sorry, Shopee can't be tracked: it blocks automated price checks, and this bot "
-    "doesn't try to get around that. Links from shops that publish standard product "
-    "information work, for example Machines or Senheng."
+    "Sorry, {shop} can't be tracked: it doesn't allow automated price checks, and this "
+    "bot respects that. Links from shops that publish standard product information "
+    "work, for example Machines or Senheng."
 )
 
 HELP = (
@@ -117,8 +124,9 @@ def _add(ctx: _Context, raw_url: str) -> str:
         return "That link doesn't look right. Send a normal http(s) product link."
 
     host = (urlsplit(url).hostname or "").removeprefix("www.")
-    if host.endswith(_UNSUPPORTED_HOSTS):
-        return UNSUPPORTED
+    for domain, shop in _UNSUPPORTED_SHOPS.items():
+        if host == domain or host.endswith("." + domain):
+            return UNSUPPORTED.format(shop=shop)
 
     session, user = ctx.session, ctx.user
     product = session.scalar(select(Product).where(Product.url == url))
