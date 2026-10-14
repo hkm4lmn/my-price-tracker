@@ -1,2 +1,4 @@
 -r requirements.txt
 pytest>=8
+# Starlette 1.8+ test client uses httpx2
+httpx2>=2.13

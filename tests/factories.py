@@ -33,7 +33,9 @@ def make_product(session, **overrides) -> Product:
 
 
 def make_watch(session, user, product, **overrides) -> Watch:
-    watch = Watch(user_id=user.id, product_id=product.id, created_at=NOW, **overrides)
+    fields = dict(created_at=NOW)
+    fields.update(overrides)
+    watch = Watch(user_id=user.id, product_id=product.id, **fields)
     session.add(watch)
     session.commit()
     return watch
